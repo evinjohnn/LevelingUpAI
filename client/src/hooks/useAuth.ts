@@ -8,45 +8,34 @@ import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-quer
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const queryClient = useQueryClient();
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [initialAuthCheckCompleted, setInitialAuthCheckCompleted] = useState(false);
 
-  // Fetch the entire API response object
-  const { data: userProfileResponse, isLoading: isProfileLoading } = useQuery({
+  // This query fetches the user's profile from our own backend
+  const { data: userProfile, isLoading: isProfileLoading, isSuccess: isProfileSuccess } = useQuery({
     queryKey: ["/api/auth/user"],
-    queryFn: async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) return null;
-        
-        const res = await fetch('/api/auth/user', {
-            headers: { 'Authorization': `Bearer ${session.access_token}` }
-        });
-        if (!res.ok) throw new Error('Failed to fetch user profile');
-        return res.json();
-    },
-    enabled: !!user,
+    enabled: !!user, // Only run this query if there's a supabase user
     retry: false,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // Cache profile for 5 mins
     placeholderData: keepPreviousData,
+    // The select function ensures we get the nested data
+    select: (response: any) => response.data,
   });
 
-  // --- THIS IS THE FIX ---
-  // We derive the actual userProfile from the nested 'data' property of the response.
-  // This ensures the rest of the app gets the object shape it expects.
-  const userProfile = userProfileResponse?.data;
-
   useEffect(() => {
+    // 1. Check for an active session on initial load
     const getSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
-      setInitialLoading(false);
+      setInitialAuthCheckCompleted(true); // Mark the initial check as done
     };
 
     getSession();
 
+    // 2. Listen for auth state changes (login, logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         if (_event === 'SIGNED_OUT') {
-          queryClient.clear();
+          queryClient.clear(); // Clear all cached data on logout
         }
         setUser(session?.user ?? null);
       }
@@ -58,6 +47,7 @@ export function useAuth() {
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    // Invalidate the user profile query to force a refetch after login
     await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     return data;
   };
@@ -71,15 +61,18 @@ export function useAuth() {
   const signOut = async () => {
     await supabase.auth.signOut();
   };
-  
-  // Adjusted isLoading logic to be more precise
-  const isLoading = initialLoading || (!!user && isProfileLoading);
+
+  // --- REFINED LOADING LOGIC ---
+  // Loading is true if:
+  // 1. We haven't finished the initial Supabase session check.
+  // 2. We have a Supabase user but are still waiting for our backend profile to load successfully.
+  const isLoading = !initialAuthCheckCompleted || (!!user && !isProfileSuccess);
 
   return {
     user,
-    userProfile, // Now this is the correct user object or undefined
+    userProfile,
     isLoading,
-    isAuthenticated: !!user,
+    isAuthenticated: !!user, // This is stable and correct
     signIn,
     signUp,
     signOut,

@@ -1,6 +1,6 @@
 // client/src/App.tsx
 
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, Redirect } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
@@ -27,8 +27,10 @@ function AuthenticatedApp() {
       <Route path="/system" component={SystemChat} />
       <Route path="/profile" component={Profile} />
       <Route path="/quests" component={Quests} />
-      {/* A user inside the app can still hit a non-existent route */}
-      <Route component={NotFound} />
+      {/* Any other route inside the app redirects to the dashboard */}
+      <Route>
+        <Redirect to="/" />
+      </Route>
     </Switch>
   );
 }
@@ -36,7 +38,6 @@ function AuthenticatedApp() {
 // This is our main router. It makes ONE decision based on the auth state.
 function AppRouter() {
   const { isAuthenticated, isLoading, userProfile } = useAuth();
-  const [location, setLocation] = useLocation();
 
   if (isLoading) {
     return (
@@ -51,25 +52,18 @@ function AppRouter() {
     );
   }
 
-  // --- FIX START: Improved routing logic ---
-  // If the user is authenticated, we then decide which "world" to show them.
+  // Once loading is false, we can make a clear decision.
   if (isAuthenticated) {
-    // If the user profile exists and onboarding is complete...
+    // If the user has a session, we check if they are onboarded.
     if (userProfile?.onboardingCompleted) {
-      // And if they are somehow still on the onboarding page, redirect them away.
-      if (location === "/onboarding") {
-        setLocation("/", { replace: true });
-        return null; // Render nothing while redirecting
-      }
-      // Otherwise, show the full authenticated app.
+      // If they are onboarded, they get the full app.
       return <AuthenticatedApp />;
     } else {
-      // If the user is authenticated but NOT onboarded, they are "jailed" on the onboarding page.
-      // We render the Onboarding component directly instead of relying on wouter's Route.
+      // If they are not onboarded, they are "jailed" on the onboarding page.
+      // We render the Onboarding component directly.
       return <Onboarding />;
     }
   }
-  // --- FIX END ---
 
   // If there's no session, they can only see the landing page.
   // Any other route will also lead here.
