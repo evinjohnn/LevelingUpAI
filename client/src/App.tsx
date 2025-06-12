@@ -1,6 +1,6 @@
 // client/src/App.tsx
 
-import { Switch, Route, useLocation, Redirect } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
@@ -17,7 +17,6 @@ import Leaderboard from "@/pages/leaderboard";
 import NotFound from "@/pages/not-found";
 import { SystemNotification } from "@/components/system-notification";
 
-// This component contains all the routes for a fully authenticated and onboarded user.
 function AuthenticatedApp() {
   return (
     <Switch>
@@ -27,15 +26,11 @@ function AuthenticatedApp() {
       <Route path="/system" component={SystemChat} />
       <Route path="/profile" component={Profile} />
       <Route path="/quests" component={Quests} />
-      {/* Any other route inside the app redirects to the dashboard */}
-      <Route>
-        <Redirect to="/" />
-      </Route>
+      <Route component={NotFound} />
     </Switch>
   );
 }
 
-// This is our main router. It makes ONE decision based on the auth state.
 function AppRouter() {
   const { isAuthenticated, isLoading, userProfile } = useAuth();
 
@@ -52,22 +47,26 @@ function AppRouter() {
     );
   }
 
-  // Once loading is false, we can make a clear decision.
+  // After loading, we can make a clear decision
   if (isAuthenticated) {
-    // If the user has a session, we check if they are onboarded.
     if (userProfile?.onboardingCompleted) {
-      // If they are onboarded, they get the full app.
       return <AuthenticatedApp />;
     } else {
-      // If they are not onboarded, they are "jailed" on the onboarding page.
-      // We render the Onboarding component directly.
+      // If profile is loaded but onboarding is not complete, show onboarding
       return <Onboarding />;
     }
   }
 
-  // If there's no session, they can only see the landing page.
-  // Any other route will also lead here.
-  return <Landing />;
+  // If not authenticated, show landing page
+  return (
+     <Switch>
+        <Route path="/" component={Landing} />
+        {/* Redirect any other path to the landing page if not authenticated */}
+        <Route>
+          <Redirect to="/" />
+        </Route>
+      </Switch>
+  );
 }
 
 

@@ -10,44 +10,44 @@ export function useAuth() {
   const queryClient = useQueryClient();
   const [initialAuthCheckCompleted, setInitialAuthCheckCompleted] = useState(false);
 
-  // This query fetches the user's profile from our own backend
-  const { data: userProfile, isLoading: isProfileLoading, isSuccess: isProfileSuccess } = useQuery({
+  const { data: userProfile, isLoading: isProfileLoading } = useQuery({
     queryKey: ["/api/auth/user"],
-    enabled: !!user, // Only run this query if there's a supabase user
-    retry: false,
-    staleTime: 5 * 60 * 1000, // Cache profile for 5 mins
+    enabled: !!user, // Only run if there's a supabase user
+    retry: 1, // Retry once on failure
+    staleTime: 5 * 60 * 1000,
     placeholderData: keepPreviousData,
-    // The select function ensures we get the nested data
     select: (response: any) => response.data,
   });
 
   useEffect(() => {
-    // 1. Check for an active session on initial load
     const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      setInitialAuthCheckCompleted(true); // Mark the initial check as done
+      await supabase.auth.getSession();
+      setInitialAuthCheckCompleted(true);
     };
 
-    getSession();
-
-    // 2. Listen for auth state changes (login, logout)
+    // The onAuthStateChange listener is the single source of truth for the user state.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        if (_event === 'SIGNED_OUT') {
-          queryClient.clear(); // Clear all cached data on logout
-        }
         setUser(session?.user ?? null);
+        if (!initialAuthCheckCompleted) {
+          setInitialAuthCheckCompleted(true);
+        }
+        if (_event === 'SIGNED_OUT') {
+          queryClient.clear();
+        }
       }
     );
 
+    // Initial check is now handled by the listener firing with INITIAL_SESSION,
+    // but we can call getSession to be safe.
+    getSession();
+
     return () => subscription.unsubscribe();
-  }, [queryClient]);
+  }, [queryClient, initialAuthCheckCompleted]);
 
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    // Invalidate the user profile query to force a refetch after login
     await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     return data;
   };
@@ -63,16 +63,15 @@ export function useAuth() {
   };
 
   // --- REFINED LOADING LOGIC ---
-  // Loading is true if:
-  // 1. We haven't finished the initial Supabase session check.
-  // 2. We have a Supabase user but are still waiting for our backend profile to load successfully.
-  const isLoading = !initialAuthCheckCompleted || (!!user && !isProfileSuccess);
+  // The app is loading if the initial auth check hasn't completed,
+  // OR if we have a user object but the profile fetch is still running.
+  const isLoading = !initialAuthCheckCompleted || (!!user && isProfileLoading);
 
   return {
     user,
     userProfile,
     isLoading,
-    isAuthenticated: !!user, // This is stable and correct
+    isAuthenticated: !!user,
     signIn,
     signUp,
     signOut,
