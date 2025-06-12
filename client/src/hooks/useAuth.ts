@@ -5,75 +5,69 @@ import { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 
-export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const queryClient = useQueryClient();
-  const [initialAuthCheckCompleted, setInitialAuthCheckCompleted] = useState(false);
+// This will be the stable status we return.
+type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
-  const { data: userProfile, isLoading: isProfileLoading } = useQuery({
-    queryKey: ["/api/auth/user"],
-    enabled: !!user, // Only run if there's a supabase user
-    retry: 1, // Retry once on failure
+export function useAuth() {
+  const queryClient = useQueryClient();
+  const [supabaseUser, setSupabaseUser] = useState<User | null>(null);
+  const [status, setStatus] = useState<AuthStatus>('loading');
+
+  // This query fetches our application-specific user profile
+  const { data: userProfile, isFetching: isProfileFetching } = useQuery({
+    queryKey: ["/api/auth/user", supabaseUser?.id],
+    // IMPORTANT: Only run this query when we have a supabaseUser
+    enabled: !!supabaseUser,
+    retry: 1,
     staleTime: 5 * 60 * 1000,
     placeholderData: keepPreviousData,
     select: (response: any) => response.data,
   });
 
   useEffect(() => {
-    const getSession = async () => {
-      await supabase.auth.getSession();
-      setInitialAuthCheckCompleted(true);
-    };
+    // Check initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSupabaseUser(session?.user ?? null);
+    });
 
-    // The onAuthStateChange listener is the single source of truth for the user state.
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        setUser(session?.user ?? null);
-        if (!initialAuthCheckCompleted) {
-          setInitialAuthCheckCompleted(true);
-        }
         if (_event === 'SIGNED_OUT') {
           queryClient.clear();
         }
+        setSupabaseUser(session?.user ?? null);
       }
     );
 
-    // Initial check is now handled by the listener firing with INITIAL_SESSION,
-    // but we can call getSession to be safe.
-    getSession();
-
     return () => subscription.unsubscribe();
-  }, [queryClient, initialAuthCheckCompleted]);
+  }, [queryClient]);
 
-  const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-    return data;
-  };
-
-  const signUp = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) throw error;
-    return data;
-  };
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-  };
-
-  // --- REFINED LOADING LOGIC ---
-  // The app is loading if the initial auth check hasn't completed,
-  // OR if we have a user object but the profile fetch is still running.
-  const isLoading = !initialAuthCheckCompleted || (!!user && isProfileLoading);
+  // This is the core of the fix. This effect determines the final, stable auth status.
+  useEffect(() => {
+    // If we have a Supabase user but we don't have their profile from our DB yet, we are still loading.
+    if (supabaseUser && userProfile === undefined) {
+      setStatus('loading');
+    } 
+    // If we have a user and their profile, they are fully authenticated.
+    else if (supabaseUser && userProfile) {
+      setStatus('authenticated');
+    } 
+    // If we have no Supabase user, they are unauthenticated.
+    else {
+      setStatus('unauthenticated');
+    }
+  }, [supabaseUser, userProfile]);
 
   return {
-    user,
+    user: supabaseUser,
     userProfile,
-    isLoading,
-    isAuthenticated: !!user,
-    signIn,
-    signUp,
-    signOut,
+    // The main loading flag is now simply derived from our stable status
+    isLoading: status === 'loading',
+    // The isAuthenticated flag is also derived from our stable status
+    isAuthenticated: status === 'authenticated',
+    signIn: (email: string, password: string) => supabase.auth.signInWithPassword({ email, password }),
+    signUp: (email: string, password: string) => supabase.auth.signUp({ email, password }),
+    signOut: () => supabase.auth.signOut(),
   };
 }
