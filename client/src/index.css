@@ -1,0 +1,116 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --system-dark: hsl(220, 30%, 5%);
+  --system-gray: hsl(220, 20%, 12%);
+  --system-lighter: hsl(220, 18%, 18%);
+  --electric: hsl(190, 100%, 70%); 
+  --electric-dark: hsl(207, 90%, 54%);
+  --neon: hsl(142, 71%, 45%);
+  --system-gold: hsl(45, 93%, 58%);
+  --danger: hsl(0, 84%, 60%);
+  --text-primary: hsl(210, 40%, 98%);
+  --text-secondary: hsl(215, 20%, 65%);
+  
+  --background: var(--system-dark);
+  --foreground: var(--text-primary);
+  --muted: var(--system-lighter);
+  --muted-foreground: var(--text-secondary);
+  
+  --popover: var(--system-gray);
+  --popover-foreground: var(--text-primary);
+
+  --card: transparent;
+  --card-foreground: var(--text-primary);
+  --border: var(--system-lighter);
+  --input: var(--system-lighter);
+  --primary: var(--electric);
+  --primary-foreground: var(--system-dark);
+  --secondary: var(--system-lighter);
+  --secondary-foreground: var(--text-primary);
+  --accent: hsl(190, 100%, 70%);
+  --accent-foreground: var(--system-dark);
+  --destructive: var(--danger);
+  --destructive-foreground: var(--text-primary);
+  --ring: var(--electric);
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    font-family: 'Orbitron', monospace;
+    background-color: var(--system-dark);
+  }
+  .font-mono { font-family: 'Space Mono', monospace; }
+}
+
+@layer components {
+  /* Holographic Panel */
+  .system-panel-frame {
+    position: relative;
+    border: 1px solid hsl(190 100% 70% / 0.15);
+    background: linear-gradient(to right, hsl(190 100% 20% / 0.1), hsl(220 30% 5% / 0.1), hsl(190 100% 20% / 0.1));
+    padding: 2px;
+    border-radius: var(--radius);
+  }
+  .system-panel-frame::before,
+  .system-panel-frame::after {
+    content: '';
+    position: absolute; left: 0; right: 0; height: 2px;
+    background: var(--electric);
+    box-shadow: 0 0 5px var(--electric), 0 0 10px var(--electric), 0 0 15px var(--electric-dark);
+    animation: flicker 4s infinite linear;
+    z-index: 1;
+  }
+  .system-panel-frame::before { top: 0px; border-top-left-radius: var(--radius); border-top-right-radius: var(--radius); }
+  .system-panel-frame::after { bottom: 0px; border-bottom-left-radius: var(--radius); border-bottom-right-radius: var(--radius); }
+
+  .system-panel-content {
+    background-color: hsl(220 30% 5% / 0.85);
+    backdrop-filter: blur(16px);
+    padding: 1.5rem;
+    border-radius: calc(var(--radius) - 2px);
+    position: relative;
+  }
+  
+  /* Specific fix for chat bubble text */
+  .user-chat-bubble p {
+    color: var(--system-dark) !important;
+  }
+  
+  /* ====================================================================== */
+  /* ==                  FINAL TEXT VISIBILITY FIX                         == */
+  /* This rule targets all input and textarea fields within your app       */
+  /* and forcefully applies the correct background and text color.         */
+  /* ====================================================================== */
+  .system-theme input, 
+  .system-theme textarea {
+      background-color: var(--system-gray) !important;
+      color: var(--text-primary) !important;
+      border-color: var(--border) !important;
+  }
+
+  /* ====================================================================== */
+  /* ==                  NEW DROPDOWN/POPOVER STYLING FIX                == */
+  /* ====================================================================== */
+  [data-radix-popper-content-wrapper] {
+    background-color: hsl(220 20% 12% / 0.8) !important; /* Translucent dark gray */
+    backdrop-filter: blur(8px) !important;
+    border: 1px solid var(--system-lighter) !important;
+    border-radius: var(--radius) !important;
+  }
+}
+
+@layer utilities {
+  @keyframes flicker {
+    0%, 18%, 22%, 25%, 53%, 57%, 100% { opacity: 1; }
+    20%, 24%, 55% { opacity: 0.6; }
+  }
+}
