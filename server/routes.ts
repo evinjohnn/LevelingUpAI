@@ -1,7 +1,10 @@
+// server/routes.ts
+
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { generateSystemResponse } from "./groq";
+import { supabase } from "./supabase"; // <-- IMPORT SUPABASE SERVER CLIENT
 import { 
   updateUserProfileSchema, 
   updateUserAvatarSchema,
@@ -11,52 +14,31 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 
-// Enhanced authentication middleware with better error handling
+// --- SECURITY FIX START: Replaced insecure JWT decoding with secure Supabase verification ---
 const isAuthenticated = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ 
-        success: false,
-        message: "Unauthorized - No token provided" 
-      });
+      return res.status(401).json({ success: false, message: "Unauthorized: No token provided" });
     }
 
     const token = authHeader.split(' ')[1];
-    
-    try {
-      // More robust JWT payload extraction with validation
-      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-      
-      if (!payload.sub) {
-        return res.status(401).json({ 
-          success: false,
-          message: "Unauthorized - Invalid token payload" 
-        });
-      }
+    const { data, error } = await supabase.auth.getUser(token);
 
-      // Add user info to request with proper typing
-      (req as any).user = { 
-        id: payload.sub, 
-        email: payload.email || null 
-      };
-      
-      next();
-    } catch (decodeError) {
-      console.error('JWT decode error:', decodeError);
-      return res.status(401).json({ 
-        success: false,
-        message: "Unauthorized - Malformed token" 
-      });
+    if (error || !data.user) {
+      return res.status(401).json({ success: false, message: `Unauthorized: ${error?.message || 'Invalid token'}` });
     }
+
+    // Attach validated user to the request object
+    (req as any).user = data.user;
+
+    next();
   } catch (error) {
     console.error('Auth middleware error:', error);
-    return res.status(500).json({ 
-      success: false,
-      message: "Internal authentication error" 
-    });
+    return res.status(500).json({ success: false, message: "Internal authentication error" });
   }
 };
+// --- SECURITY FIX END ---
 
 // Helper function for consistent error responses
 const handleError = (res: Response, error: any, defaultMessage: string, statusCode: number = 500) => {
@@ -79,7 +61,6 @@ const handleError = (res: Response, error: any, defaultMessage: string, statusCo
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
-  // Enhanced auth route with better error handling
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
@@ -101,32 +82,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Enhanced profile update route with your improvements
   app.patch('/api/profile', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const body = req.body;
       let updatedUser;
 
-      // Avatar-only update
       if (body.profileImageUrl && Object.keys(body).length === 1) {
         const avatarData = updateUserAvatarSchema.parse(body);
         updatedUser = await storage.updateUserProfile(userId, avatarData);
       }
-      // Character class update
       else if (body.characterClass && Object.keys(body).length === 1) {
-        // Add validation schema for character class if needed
         const characterClassData = z.object({
           characterClass: z.string().min(1)
         }).parse(body);
         updatedUser = await storage.updateUserProfile(userId, characterClassData);
       }
-      // Full profile update (onboarding)
       else {
         const profileData = updateUserProfileSchema.parse(body);
         updatedUser = await storage.updateUserProfile(userId, profileData);
         
-        // Generate quests after onboarding completion
         if (profileData.onboardingCompleted) {
           try {
             await Promise.all([
@@ -135,7 +110,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ]);
           } catch (questError) {
             console.warn('Failed to generate quests after onboarding:', questError);
-            // Don't fail the entire request if quest generation fails
           }
         }
       }
@@ -146,18 +120,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Enhanced workout routes
   app.get('/api/workouts', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       
-      // Validate limit parameter
       if (limit && (isNaN(limit) || limit < 1 || limit > 100)) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid limit parameter. Must be between 1 and 100."
-        });
+        return res.status(400).json({ success: false, message: "Invalid limit parameter. Must be between 1 and 100." });
       }
       
       const workouts = await storage.getWorkouts(userId, limit);
@@ -182,18 +151,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Enhanced quest routes with better error handling
   app.get('/api/quests', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const type = req.query.type as string;
       
-      // Validate quest type if provided
       if (type && !['daily', 'weekly', 'special'].includes(type)) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid quest type. Must be 'daily', 'weekly', or 'special'."
-        });
+        return res.status(400).json({ success: false, message: "Invalid quest type. Must be 'daily', 'weekly', or 'special'." });
       }
       
       const quests = await storage.getUserQuests(userId, type);
@@ -228,10 +192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const questId = parseInt(req.params.id);
       
       if (isNaN(questId)) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid quest ID"
-        });
+        return res.status(400).json({ success: false, message: "Invalid quest ID" });
       }
       
       const quest = await storage.completeQuest(questId);
@@ -241,7 +202,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Enhanced meal routes
   app.get('/api/meals', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
@@ -250,10 +210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.query.date) {
         date = new Date(req.query.date as string);
         if (isNaN(date.getTime())) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid date format"
-          });
+          return res.status(400).json({ success: false, message: "Invalid date format" });
         }
       }
       
@@ -279,17 +236,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Enhanced system AI routes
   app.get('/api/system/messages', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       
       if (limit && (isNaN(limit) || limit < 1 || limit > 100)) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid limit parameter. Must be between 1 and 100."
-        });
+        return res.status(400).json({ success: false, message: "Invalid limit parameter. Must be between 1 and 100." });
       }
       
       const messages = await storage.getSystemMessages(userId, limit);
@@ -305,40 +258,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { message } = req.body;
       
       if (!message || typeof message !== 'string' || message.trim().length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: "Valid message is required"
-        });
+        return res.status(400).json({ success: false, message: "Valid message is required" });
       }
       
       if (message.length > 1000) {
-        return res.status(400).json({
-          success: false,
-          message: "Message too long. Maximum 1000 characters."
-        });
+        return res.status(400).json({ success: false, message: "Message too long. Maximum 1000 characters." });
       }
       
       const response = await generateSystemResponse(userId, message.trim());
       res.json({ success: true, data: { response } });
     } catch (error) {
       console.error("Error generating system response:", error);
-      res.status(503).json({ 
-        success: false,
-        message: "The System is temporarily unavailable" 
-      });
+      res.status(503).json({ success: false, message: "The System is temporarily unavailable" });
     }
   });
 
-  // Enhanced leaderboard route
   app.get('/api/leaderboard', isAuthenticated, async (req: any, res) => {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
       
       if (isNaN(limit) || limit < 1 || limit > 100) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid limit parameter. Must be between 1 and 100."
-        });
+        return res.status(400).json({ success: false, message: "Invalid limit parameter. Must be between 1 and 100." });
       }
       
       const topUsers = await storage.getLeaderboard(limit);
@@ -348,17 +288,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Enhanced stats routes
   app.get('/api/stats', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
       
       if (!user) {
-        return res.status(404).json({ 
-          success: false,
-          message: "User not found" 
-        });
+        return res.status(404).json({ success: false, message: "User not found" });
       }
       
       const [workouts, quests] = await Promise.all([

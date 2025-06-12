@@ -1,3 +1,5 @@
+// client/src/lib/queryClient.ts
+
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { supabase } from "./supabase";
 
@@ -8,17 +10,16 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+// --- FIX: This function now returns the parsed JSON object ---
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
-): Promise<Response> {
-  // Get the current session token
+): Promise<any> { // Return type is now any, as it's parsed JSON
   const { data: { session } } = await supabase.auth.getSession();
   
   const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
 
-  // Add authorization header if user is authenticated
   if (session?.access_token) {
     headers.Authorization = `Bearer ${session.access_token}`;
   }
@@ -31,21 +32,20 @@ export async function apiRequest(
   });
 
   await throwIfResNotOk(res);
-  return res;
+  return res.json(); // <-- Return the parsed JSON
 }
 
+// This function is already correct for useQuery and doesn't need changes.
 type UnauthorizedBehavior = "returnNull" | "throw";
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    // Get the current session token
     const { data: { session } } = await supabase.auth.getSession();
     
     const headers: Record<string, string> = {};
 
-    // Add authorization header if user is authenticated
     if (session?.access_token) {
       headers.Authorization = `Bearer ${session.access_token}`;
     }

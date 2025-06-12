@@ -1,3 +1,5 @@
+// client/src/pages/dashboard.tsx
+
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import SystemHeader from "@/components/system-header";
@@ -13,8 +15,17 @@ export default function Dashboard() {
   const { userProfile: user } = useAuth();
   const [, setLocation] = useLocation();
 
-  const { data: quests = [] } = useQuery({ queryKey: ["/api/quests?type=daily"] });
-  const { data: recentMessages = [] } = useQuery({ queryKey: ["/api/system/messages?limit=1"] });
+  // --- FIX START: Added 'select' option to parse the API responses correctly ---
+  const { data: quests = [] } = useQuery({ 
+    queryKey: ["/api/quests?type=daily"],
+    select: (response: any) => response.data,
+  });
+  const { data: recentMessages = [] } = useQuery({ 
+    queryKey: ["/api/system/messages?limit=1"],
+    select: (response: any) => response.data,
+  });
+  // --- FIX END ---
+
   const latestMessage = recentMessages.find((m: any) => m.role === "assistant");
 
   return (

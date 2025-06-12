@@ -1,4 +1,6 @@
-import { Switch, Route } from "wouter";
+// client/src/App.tsx
+
+import { Switch, Route, useLocation } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
@@ -34,6 +36,7 @@ function AuthenticatedApp() {
 // This is our main router. It makes ONE decision based on the auth state.
 function AppRouter() {
   const { isAuthenticated, isLoading, userProfile } = useAuth();
+  const [location, setLocation] = useLocation();
 
   if (isLoading) {
     return (
@@ -48,19 +51,31 @@ function AppRouter() {
     );
   }
 
+  // --- FIX START: Improved routing logic ---
+  // If the user is authenticated, we then decide which "world" to show them.
   if (isAuthenticated) {
-    // If the user has a session, we check if they are onboarded.
-    // If not, they are "jailed" on the onboarding page.
-    if (!userProfile?.onboardingCompleted) {
+    // If the user profile exists and onboarding is complete...
+    if (userProfile?.onboardingCompleted) {
+      // And if they are somehow still on the onboarding page, redirect them away.
+      if (location === "/onboarding") {
+        setLocation("/", { replace: true });
+        return null; // Render nothing while redirecting
+      }
+      // Otherwise, show the full authenticated app.
+      return <AuthenticatedApp />;
+    } else {
+      // If the user is authenticated but NOT onboarded, they are "jailed" on the onboarding page.
+      // We render the Onboarding component directly instead of relying on wouter's Route.
       return <Onboarding />;
     }
-    // If they are onboarded, they get the full app.
-    return <AuthenticatedApp />;
   }
+  // --- FIX END ---
 
   // If there's no session, they can only see the landing page.
+  // Any other route will also lead here.
   return <Landing />;
 }
+
 
 function App() {
   return (

@@ -1,3 +1,5 @@
+// client/src/hooks/useAuth.ts
+
 import { useState, useEffect } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
@@ -8,13 +10,29 @@ export function useAuth() {
   const queryClient = useQueryClient();
   const [initialLoading, setInitialLoading] = useState(true);
 
-  const { data: userProfile, isLoading: isProfileLoading } = useQuery({
+  // Fetch the entire API response object
+  const { data: userProfileResponse, isLoading: isProfileLoading } = useQuery({
     queryKey: ["/api/auth/user"],
+    queryFn: async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) return null;
+        
+        const res = await fetch('/api/auth/user', {
+            headers: { 'Authorization': `Bearer ${session.access_token}` }
+        });
+        if (!res.ok) throw new Error('Failed to fetch user profile');
+        return res.json();
+    },
     enabled: !!user,
     retry: false,
-    staleTime: 5 * 60 * 1000, // Cache profile for 5 mins
+    staleTime: 5 * 60 * 1000,
     placeholderData: keepPreviousData,
   });
+
+  // --- THIS IS THE FIX ---
+  // We derive the actual userProfile from the nested 'data' property of the response.
+  // This ensures the rest of the app gets the object shape it expects.
+  const userProfile = userProfileResponse?.data;
 
   useEffect(() => {
     const getSession = async () => {
@@ -53,12 +71,13 @@ export function useAuth() {
   const signOut = async () => {
     await supabase.auth.signOut();
   };
-
-  const isLoading = initialLoading || (!!user && isProfileLoading && !userProfile);
+  
+  // Adjusted isLoading logic to be more precise
+  const isLoading = initialLoading || (!!user && isProfileLoading);
 
   return {
     user,
-    userProfile,
+    userProfile, // Now this is the correct user object or undefined
     isLoading,
     isAuthenticated: !!user,
     signIn,

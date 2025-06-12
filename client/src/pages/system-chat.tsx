@@ -1,3 +1,5 @@
+// client/src/pages/system-chat.tsx
+
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -13,14 +15,24 @@ export default function SystemChat() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: messages = [], isLoading } = useQuery({ queryKey: ["/api/system/messages"] });
+  const { data: messages = [], isLoading } = useQuery({
+    queryKey: ["/api/system/messages"],
+    select: (response: any) => response.data || [], // Ensure it's always an array
+  });
 
   const sendMessageMutation = useMutation({
     mutationFn: async (userMessage: string) => {
-      queryClient.setQueryData(["/api/system/messages"], (old: any) => [{ role: 'user', content: userMessage, id: Date.now() }, ...old]);
+      // Optimistically update the UI with the user's message
+      // The server sends newest-first, so we add the new message to the start of the array.
+      queryClient.setQueryData(["/api/system/messages"], (old: any) => {
+        const oldData = old?.data || [];
+        return { 
+          success: true, 
+          data: [{ role: 'user', content: userMessage, id: Date.now() }, ...oldData] 
+        };
+      });
       setMessage("");
-      const response = await apiRequest("POST", "/api/system/chat", { message: userMessage });
-      return response.json();
+      return apiRequest("POST", "/api/system/chat", { message: userMessage });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/system/messages"] });
@@ -53,7 +65,7 @@ export default function SystemChat() {
         <div className="flex-1 overflow-y-auto space-y-4 pr-2">
           {isLoading && <p className="text-center text-text-secondary">Establishing secure connection...</p>}
           
-          {/* FIX: Reverse the messages array before mapping to display oldest first */}
+          {/* --- FIX: Restored the .reverse() to show oldest messages first --- */}
           {[...messages].reverse().map((msg: any) => (
             <div key={msg.id} className={`flex items-end gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
               {msg.role === 'assistant' && <i className="fas fa-robot text-electric text-lg mb-2"></i>}

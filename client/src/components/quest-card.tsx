@@ -9,37 +9,67 @@ interface QuestCardProps {
     title: string;
     description: string;
     xpReward: number;
-    goldReward?: number;
     completed: boolean;
     type: string;
     completedAt?: string;
   };
 }
 
+// Helper function to determine the visual style based on quest status and type
+const getQuestAppearance = (quest: QuestCardProps['quest']) => {
+  if (quest.completed) {
+    return {
+      icon: "fas fa-check-double",
+      bgColor: "bg-neon/10",
+      textColor: "text-neon",
+      borderColor: "border-neon/30",
+      glowColor: "shadow-neon/20",
+    };
+  }
+  switch (quest.type) {
+    case 'daily':
+      return {
+        icon: "fas fa-hourglass-half",
+        bgColor: "bg-electric/10",
+        textColor: "text-electric",
+        borderColor: "border-electric/30",
+        glowColor: "shadow-electric/20",
+      };
+    case 'weekly':
+      return {
+        icon: "fas fa-calendar-check",
+        bgColor: "bg-purple-500/10",
+        textColor: "text-purple-400",
+        borderColor: "border-purple-500/30",
+        glowColor: "shadow-purple-500/20",
+      };
+    default: // Special quests or fallbacks
+      return {
+        icon: "fas fa-star",
+        bgColor: "bg-system-gold/10",
+        textColor: "text-system-gold",
+        borderColor: "border-system-gold/30",
+        glowColor: "shadow-yellow-500/20",
+      };
+  }
+};
+
 export default function QuestCard({ quest }: QuestCardProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const appearance = getQuestAppearance(quest);
 
   const completeQuestMutation = useMutation({
-    mutationFn: async () => {
-      return await apiRequest("PATCH", `/api/quests/${quest.id}/complete`, {});
-    },
+    mutationFn: async () => apiRequest("PATCH", `/api/quests/${quest.id}/complete`, {}),
     onSuccess: () => {
       toast({
         title: "Quest Completed!",
         description: `+${quest.xpReward} XP gained! Well done, Hunter.`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/quests"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
+    onError: (error) => toast({ title: "Error", description: error.message, variant: "destructive" }),
   });
 
   const handleCompleteQuest = () => {
@@ -48,93 +78,51 @@ export default function QuestCard({ quest }: QuestCardProps) {
     }
   };
 
-  const getQuestIcon = () => {
-    if (quest.completed) return "fas fa-check";
-    if (quest.type === "daily") return "fas fa-hourglass-half";
-    if (quest.type === "weekly") return "fas fa-calendar-week";
-    return "fas fa-scroll";
-  };
-
-  const getQuestColor = () => {
-    if (quest.completed) return "border-neon bg-neon";
-    if (quest.type === "daily") return "border-electric bg-electric";
-    if (quest.type === "weekly") return "border-purple-500 bg-purple-500";
-    return "border-system-gold bg-system-gold";
-  };
-
-  const getBorderColor = () => {
-    if (quest.completed) return "border-l-4 border-neon";
-    if (quest.type === "daily") return "border-l-4 border-electric";
-    if (quest.type === "weekly") return "border-l-4 border-purple-500";
-    return "border-l-4 border-system-gold";
-  };
-
   return (
-    <div className={`glass-card rounded-xl p-4 ${getBorderColor()}`}>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center space-x-3 flex-1">
-          <div className={`w-8 h-8 ${getQuestColor()} rounded-lg flex items-center justify-center`}>
-            <i className={`${getQuestIcon()} text-system-dark text-sm`}></i>
-          </div>
-          <div className="flex-1">
-            <h3 className="font-semibold text-sm text-text-primary">{quest.title}</h3>
-            <p className="text-xs text-text-secondary">{quest.description}</p>
-          </div>
+    <div className={`relative bg-system-gray/50 border ${appearance.borderColor} rounded-xl p-4 transition-all duration-300 hover:bg-system-gray/80 hover:shadow-lg ${appearance.glowColor}`}>
+      <div className="flex items-center space-x-4">
+        {/* Prominent Icon */}
+        <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${appearance.bgColor} ${appearance.textColor} border ${appearance.borderColor}`}>
+          <i className={`${appearance.icon} text-xl`}></i>
         </div>
-        <div className="text-right ml-3">
-          <p className={`font-bold text-sm ${quest.completed ? "text-neon" : "text-electric"}`}>
-            +{quest.xpReward} XP
-          </p>
-          <p className="text-xs text-text-secondary">
+        
+        {/* Title and Description */}
+        <div className="flex-1">
+          <h3 className="font-bold text-base text-text-primary">{quest.title}</h3>
+          <p className="text-xs text-text-secondary mt-1">{quest.description}</p>
+        </div>
+
+        {/* XP and Status */}
+        <div className="text-right flex-shrink-0">
+          <p className={`font-black text-lg ${appearance.textColor}`}>+{quest.xpReward} XP</p>
+          <p className={`text-xs font-mono ${quest.completed ? appearance.textColor : 'text-text-secondary'}`}>
             {quest.completed ? "Completed" : "Pending"}
           </p>
         </div>
       </div>
-
-      {/* Quest Progress/Actions */}
+      
+      {/* Action Button for Daily Quests */}
       {!quest.completed && quest.type === "daily" && (
-        <div className="mt-3">
+        <div className="mt-4">
           <Button
             onClick={handleCompleteQuest}
             disabled={completeQuestMutation.isPending}
             size="sm"
-            className="w-full gradient-electric text-system-dark hover:shadow-glow transition-all duration-300"
+            className={`w-full font-bold transition-all duration-300 ${appearance.bgColor} ${appearance.textColor} border ${appearance.borderColor} hover:bg-system-dark hover:shadow-md ${appearance.glowColor}`}
           >
             {completeQuestMutation.isPending ? (
-              <span className="flex items-center">
-                <i className="fas fa-spinner fa-spin mr-2"></i>
-                Completing...
-              </span>
+              <span className="flex items-center"><i className="fas fa-spinner fa-spin mr-2"></i>Completing...</span>
             ) : (
-              <span className="flex items-center">
-                <i className="fas fa-check mr-2"></i>
-                Mark Complete
-              </span>
+              <span className="flex items-center"><i className="fas fa-check mr-2"></i>Mark as Complete</span>
             )}
           </Button>
         </div>
       )}
 
-      {/* Show completion time if completed */}
-      {quest.completed && quest.completedAt && (
-        <div className="mt-2 text-xs text-text-secondary font-mono">
-          Completed: {new Date(quest.completedAt).toLocaleDateString()}
-        </div>
-      )}
-
-      {/* Special quest types can have progress bars */}
-      {!quest.completed && quest.title.includes("Water") && (
-        <div className="mt-3">
-          <div className="h-2 bg-system-lighter rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-electric rounded-full"
-              style={{ width: "40%" }} // This would be calculated based on actual progress
-            ></div>
-          </div>
-          <div className="flex justify-between text-xs text-text-secondary mt-1">
-            <span>1.2L / 3L</span>
-            <span>40%</span>
-          </div>
+       {/* Completion Date */}
+       {quest.completed && quest.completedAt && (
+        <div className="mt-3 text-right text-xs text-text-secondary/70 font-mono">
+          [ Cleared: {new Date(quest.completedAt).toLocaleDateString()} ]
         </div>
       )}
     </div>

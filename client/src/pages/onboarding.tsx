@@ -1,7 +1,10 @@
+// client/src/pages/onboarding.tsx
+
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter"; // <-- We need this for navigation
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -27,6 +30,8 @@ export default function Onboarding() {
   const [step, setStep] = useState(1);
   const { toast } = useToast();
   const { userProfile } = useAuth();
+  const queryClient = useQueryClient();
+  const [, setLocation] = useLocation(); // <-- Get the navigation function
 
   const form = useForm<OnboardingFormData>({
     resolver: zodResolver(onboardingFormSchema),
@@ -48,17 +53,20 @@ export default function Onboarding() {
     mutationFn: async (data: UpdateUserProfile) => {
       return await apiRequest("PATCH", "/api/profile", data);
     },
+    // --- FIX START: Changed hard reload to client-side navigation ---
     onSuccess: () => {
       toast({
         title: "Profile Synchronized",
         description: "Welcome to The System, Hunter. Your training begins now.",
       });
-      // --- THIS IS THE BULLETPROOF FIX ---
-      // Force a full page reload to the root. This completely clears all old
-      // client-side state and forces the app to re-initialize. The router
-      // will then see the updated user profile and render the dashboard.
-      window.location.href = "/";
+      // Invalidate the query to trigger a background refetch.
+      // This is crucial so the useAuth hook gets the new profile state.
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      
+      // Navigate to the dashboard. The AppRouter will see the new profile on the next render.
+      setLocation("/", { replace: true });
     },
+    // --- FIX END ---
     onError: (error) => {
       toast({
         title: "Synchronization Error",

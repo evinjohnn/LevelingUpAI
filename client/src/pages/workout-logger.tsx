@@ -1,6 +1,7 @@
+// client/src/pages/workout-logger.tsx
+
 import { useForm, useFieldArray } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
@@ -10,8 +11,6 @@ import BottomNavigation from "@/components/bottom-navigation";
 import { useLocation } from "wouter";
 import { PPL_WORKOUT_PLAN } from "@/lib/workout-plan";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import ExerciseProgressChart from "@/components/exercise-progress-chart";
 import { z } from "zod";
 import { SystemPanel } from "@/components/ui/system-panel";
 
@@ -55,16 +54,26 @@ export default function WorkoutLogger() {
     const createWorkoutMutation = useMutation({
         mutationFn: async (data: WorkoutFormData) => {
             const totalVolume = data.exercises.reduce((sum, ex) => sum + ex.sets.reduce((setSum, s) => setSum + s.weight * s.reps, 0), 0);
+            // apiRequest now returns the parsed JSON directly
             return await apiRequest("POST", "/api/workouts", { ...data, totalVolume: totalVolume.toString() });
         },
-        onSuccess: async (res) => {
-            const result = await res.json();
-            toast({ title: result.analysis.progressiveOverload ? "Progressive Overload!" : "Workout Logged", description: result.analysis.message });
+        // --- FIX START: Correctly handle the API response ---
+        onSuccess: (response: any) => {
+            // The 'response' is already the parsed JSON: { success: true, data: { ... } }
+            // We just need to access the nested 'data' property.
+            const result = response.data;
+            
+            toast({ 
+                title: result.analysis.progressiveOverload ? "Progressive Overload!" : "Workout Logged", 
+                description: result.analysis.message 
+            });
+            
             queryClient.invalidateQueries({ queryKey: ["/api/workouts"] });
             queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
             queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
             setLocation("/");
         },
+        // --- FIX END ---
         onError: (error) => toast({ title: "Error", description: error.message, variant: "destructive" }),
     });
 

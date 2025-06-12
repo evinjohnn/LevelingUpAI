@@ -1,3 +1,5 @@
+/* client/src/index.css */
+
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap');
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
 
@@ -85,23 +87,33 @@
     color: var(--system-dark) !important;
   }
   
-  /* ====================================================================== */
-  /* ==                  FINAL TEXT VISIBILITY FIX                         == */
-  /* This rule targets all input and textarea fields within your app       */
-  /* and forcefully applies the correct background and text color.         */
-  /* ====================================================================== */
-  .system-theme input, 
-  .system-theme textarea {
+  /* --- FIX START: More specific input styling to override ShadCN defaults --- */
+  /* This targets any input or textarea inside our main theme container */
+  .system-theme {
+    /* Style for ShadCN inputs specifically */
+    & .bg-background {
       background-color: var(--system-gray) !important;
       color: var(--text-primary) !important;
-      border-color: var(--border) !important;
-  }
+      border-color: var(--system-lighter) !important;
+    }
 
-  /* ====================================================================== */
-  /* ==                  NEW DROPDOWN/POPOVER STYLING FIX                == */
-  /* ====================================================================== */
+    /* A more general fallback for any other inputs */
+    & input, & textarea {
+      background-color: var(--system-gray) !important;
+      color: var(--text-primary) !important;
+      border-color: var(--system-lighter) !important;
+    }
+
+    /* Specifically style the placeholder text color */
+    & ::placeholder {
+      color: var(--text-secondary) !important;
+      opacity: 1; /* Firefox */
+    }
+  }
+  /* --- FIX END --- */
+
   [data-radix-popper-content-wrapper] {
-    background-color: hsl(220 20% 12% / 0.8) !important; /* Translucent dark gray */
+    background-color: hsl(220 20% 12% / 0.8) !important;
     backdrop-filter: blur(8px) !important;
     border: 1px solid var(--system-lighter) !important;
     border-radius: var(--radius) !important;

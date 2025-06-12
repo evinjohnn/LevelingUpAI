@@ -1,3 +1,4 @@
+
 interface RPGStatsProps {
   stats?: {
     strength: number;
@@ -8,70 +9,46 @@ interface RPGStatsProps {
 }
 
 export default function RPGStats({ stats }: RPGStatsProps) {
+  // Mapping stats to the Solo Leveling equivalents and new icons
   const statsData = [
     {
       key: "strength",
       label: "STR",
       value: stats?.strength || 10,
-      color: "red",
       icon: "fas fa-fist-raised",
-      bgColor: "bg-red-500",
-      textColor: "text-red-400",
     },
     {
       key: "endurance",
-      label: "END",
+      label: "VIT", // Changed to VIT for Vitality/Endurance
       value: stats?.endurance || 10,
-      color: "green",
-      icon: "fas fa-running",
-      bgColor: "bg-green-500",
-      textColor: "text-green-400",
+      icon: "fas fa-heartbeat",
     },
     {
       key: "wisdom",
-      label: "WIS",
+      label: "INT", // Changed to INT for Intelligence/Wisdom
       value: stats?.wisdom || 10,
-      color: "blue",
       icon: "fas fa-brain",
-      bgColor: "bg-blue-500",
-      textColor: "text-blue-400",
     },
     {
       key: "discipline",
-      label: "DISC",
+      label: "AGI", // Re-purposed for Agility/Discipline
       value: stats?.discipline || 10,
-      color: "purple",
-      icon: "fas fa-medal",
-      bgColor: "bg-purple-500",
-      textColor: "text-purple-400",
+      icon: "fas fa-running",
     },
   ];
 
   return (
     <div>
-      <h2 className="text-lg font-bold mb-3 flex items-center text-text-primary">
-        <i className="fas fa-chart-line text-electric mr-2"></i>
-        Hunter Statistics
+      <h2 className="text-xl font-black tracking-widest mb-4 text-center text-electric text-glow">
+        STATUS
       </h2>
       
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-x-8 gap-y-4 font-mono">
         {statsData.map((stat) => (
-          <div key={stat.key} className="glass-card rounded-xl p-3">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center space-x-2">
-                <div className={`w-6 h-6 ${stat.bgColor} rounded-md flex items-center justify-center`}>
-                  <i className={`${stat.icon} text-xs text-white`}></i>
-                </div>
-                <span className="font-semibold text-sm text-text-primary">{stat.label}</span>
-              </div>
-              <span className={`font-bold ${stat.textColor}`}>{stat.value}</span>
-            </div>
-            <div className="h-2 bg-system-lighter rounded-full overflow-hidden">
-              <div 
-                className={`h-full ${stat.bgColor} stat-bar rounded-full`}
-                style={{ width: `${Math.min(100, stat.value)}%` }}
-              ></div>
-            </div>
+          <div key={stat.key} className="flex items-center space-x-3">
+            <i className={`${stat.icon} text-electric text-lg w-6 text-center`}></i>
+            <span className="text-text-secondary">{stat.label}:</span>
+            <span className="font-bold text-lg text-text-primary">{stat.value}</span>
           </div>
         ))}
       </div>
