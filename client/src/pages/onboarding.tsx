@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { SystemPanel } from "@/components/ui/system-panel"; // Updated: Use SystemPanel
+import { SystemPanel } from "@/components/ui/system-panel";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -120,7 +120,6 @@ export default function Onboarding() {
       </div>
       <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
         <div className="max-w-md w-full">
-          {/* --- UI CHANGE START: Replaced Card with SystemPanel --- */}
           <SystemPanel>
             <div className="text-center">
               <div className="w-16 h-16 gradient-electric rounded-xl mx-auto mb-4 flex items-center justify-center">
@@ -144,7 +143,8 @@ export default function Onboarding() {
                      <FormField control={form.control} name="age" render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-text-primary">Age</FormLabel>
-                          <FormControl><Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value) || undefined)} className="bg-system-gray" placeholder="e.g., 25" /></FormControl>
+                          {/* --- FIX: Use valueAsNumber for robust number handling --- */}
+                          <FormControl><Input type="number" {...field} onChange={e => field.onChange(e.target.valueAsNumber || undefined)} className="bg-system-gray" placeholder="e.g., 25" /></FormControl>
                           <FormMessage />
                         </FormItem>
                      )}/>
@@ -162,14 +162,16 @@ export default function Onboarding() {
                        <FormField control={form.control} name="height" render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-text-primary">Height (cm)</FormLabel>
-                            <FormControl><Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value) || undefined)} className="bg-system-gray" placeholder="e.g., 180" /></FormControl>
+                            {/* --- FIX: Use valueAsNumber for robust number handling --- */}
+                            <FormControl><Input type="number" {...field} onChange={e => field.onChange(e.target.valueAsNumber || undefined)} className="bg-system-gray" placeholder="e.g., 180" /></FormControl>
                             <FormMessage />
                           </FormItem>
                        )}/>
                        <FormField control={form.control} name="weight" render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-text-primary">Weight (kg)</FormLabel>
-                            <FormControl><Input type="number" step="0.1" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || undefined)} className="bg-system-gray" placeholder="e.g., 75.5" /></FormControl>
+                             {/* --- FIX: Use valueAsNumber for robust number handling --- */}
+                            <FormControl><Input type="number" step="0.1" {...field} onChange={e => field.onChange(e.target.valueAsNumber || undefined)} className="bg-system-gray" placeholder="e.g., 75.5" /></FormControl>
                             <FormMessage />
                           </FormItem>
                        )}/>
@@ -202,7 +204,8 @@ export default function Onboarding() {
                       <FormField control={form.control} name="bodyFatPercentage" render={({ field }) => (
                          <FormItem>
                           <FormLabel className="text-text-primary">Body Fat % (optional)</FormLabel>
-                          <FormControl><Input type="number" step="0.1" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || undefined)} className="bg-system-gray" placeholder="e.g., 15.5" /></FormControl>
+                           {/* --- FIX: Use valueAsNumber for robust number handling --- */}
+                          <FormControl><Input type="number" step="0.1" {...field} onChange={e => field.onChange(e.target.valueAsKey || undefined)} className="bg-system-gray" placeholder="e.g., 15.5" /></FormControl>
                            <FormMessage />
                         </FormItem>
                      )}/>
@@ -249,7 +252,6 @@ export default function Onboarding() {
               </form>
             </Form>
           </SystemPanel>
-          {/* --- UI CHANGE END --- */}
         </div>
       </div>
     </div>
